@@ -226,6 +226,9 @@ object Rep {
       }
     }
 
+  import scala.language.implicitConversions
+  implicit def boolToInt(b:Boolean)= if (b) 1 else 0
+
   implicit val Infos: Rep[Info] = new Rep[Info] {
     def map = { r =>
       (for {
@@ -247,9 +250,33 @@ object Rep {
       } yield Info(
         cont.toInt, images.toInt, driver, exDriver, kVersion,
         debug.toInt, nfd.toInt, ngor.toInt, nevl.toInt, initpath,
-        indexSvrAddr, memLim.toInt, swapLim.toInt, ipv4.toInt)).head
+        indexSvrAddr, memLim.toInt, swapLim.toInt, ipv4.toInt)).headOption.getOrElse{
+        // Fallback on 1.7+ Docker version that has replaced some int to boolean
+        (for {
+          JObject(info) <- as.json4s.Json(r)
+          ("Containers", JInt(cont)) <- info
+          ("Images", JInt(images))               <- info
+          ("Driver", JString(driver))            <- info
+          ("ExecutionDriver", JString(exDriver)) <- info
+          ("KernelVersion", JString(kVersion))   <- info
+          ("Debug", JBool(debug))                 <- info
+          ("NFd", JInt(nfd))                     <- info
+          ("NGoroutines", JInt(ngor)) <- info
+          ("NEventsListener", JInt(nevl)) <- info
+          ("InitPath", JString(initpath)) <- info
+          ("IndexServerAddress", JString(indexSvrAddr)) <- info
+          ("MemoryLimit", JBool(memLim)) <- info
+          ("SwapLimit", JBool(swapLim)) <- info
+          ("IPv4Forwarding", JBool(ipv4)) <- info
+        } yield Info(
+            cont.toInt, images.toInt, driver, exDriver, kVersion,
+            debug, nfd.toInt, ngor.toInt, nevl.toInt, initpath,
+            indexSvrAddr, memLim.toInt, swapLim.toInt, ipv4.toInt)).head
+
+      }
     }
   }
+
 
   implicit val ListOfContainers: Rep[List[Container]] =
     new Rep[List[Container]] with Common {
